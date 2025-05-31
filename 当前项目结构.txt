@@ -1,0 +1,19 @@
+SLES/
+├── src/
+│   ├── core/                 # 核心应用逻辑
+│   │   ├── application.py   # 原main.py主逻辑迁移至此
+│   ├── models/              # 数据模型
+│   │   ├── student.py       # 原model/student.py
+│   ├── services/            # 业务服务
+│   │   ├── config_service.py # 整合config/config_manager.py
+│   │   └── student_service.py # 原data/student_manager.py
+│   ├── repositories/        # 数据存储
+│   │   ├── absence_repo.py  # 原ui/absence_dialog.py数据逻辑
+│   ├── utils/               # 工具类
+│   │   ├── paths.py         # 路径管理（已存在）
+│   │   └── logger.py       # 原main.py日志配置
+│   └── ui/                  # 界面层
+│       ├── windows/         # 主窗口
+│       │   ├── main_window.py # 原ui/main_window.py 
+│       ├── dialogs/         # 对话框
+│       │   ├── history_dialog.py # 原ui/history_dialog.py

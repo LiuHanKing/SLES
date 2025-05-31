@@ -1,0 +1,12 @@
+{
+    "version": "1.0.0",
+    "student_file": "students.xlsx",
+    "absence_file": "conf/absence.json",
+    "backup_dir": "bakfiles",
+    "log_dir": "log",
+    "animation_duration": 3,
+    "weights": {
+        "default": 1,
+        "custom_weights": {}
+    }
+}
