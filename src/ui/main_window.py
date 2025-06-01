@@ -1,243 +1,321 @@
-# 修改导入部分
-from PyQt5.QtWidgets import (QMainWindow, QMenuBar, QAction, QDialog, 
-                            QVBoxLayout, QLabel, QTimeEdit, QPushButton, 
-                            QHBoxLayout, QMessageBox, QWidget, QApplication, 
-                            QFontDialog, QTextEdit)  # 新增QTextEdit导入
-from ui.draw_panel import DrawPanel
-from ui.setting_panel import SettingPanel
-from ui.history_dialog import HistoryDialog
-import logging
-from config.config_manager import ConfigManager
-from PyQt5.QtGui import QFont  # 添加这行导入
-from PyQt5.QtWidgets import QMainWindow
-from .draw_panel import DrawPanel
-from PyQt5.QtWidgets import QSizePolicy  # 新增导入
+import os  # 新增 os 模块导入
+from pathlib import Path
+from PyQt5.QtWidgets import QMainWindow, QLabel, QMessageBox, QVBoxLayout, QWidget, QPushButton, QTextEdit, QSplitter, QHBoxLayout, QSpinBox, QComboBox, QFontComboBox
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
+from services.config_service import ConfigService
+from services.draw_service import DrawService
+from src.services.record_service import RecordService
+from services.excel_service import ExcelService
+import pandas as pd
+import json
 
 class MainWindow(QMainWindow):
-    def __init__(self, config):
+    def __init__(self):
         super().__init__()
-        self.config = config  # 接收全局配置
+        self.draw_service = DrawService()  # 初始化抽签服务
+        self.config = ConfigService.load_config()  # 初始化配置
+        # 修正配置文件路径
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'conf', 'config.json')
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                self.config = json.load(f)
+        except FileNotFoundError:
+            print(f"未找到配置文件: {config_path}")
+            QMessageBox.warning(self, "错误", f"未找到配置文件: {config_path}")
+        
+        # 获取 spacing 参数
+        self.spacing = self.config.get('spacing', 50)
+        
+        # 应用 spacing 参数到布局
         self.init_ui()
+        self.auto_load_student_list()
+        self.is_drawing = False  # 新增标志位，用于判断是否正在抽签
+
+        # 读取配置中的宽度和高度并设置窗口大小
+        window_config = self.config.get('window', {})
+        width = window_config.get('width', 800)
+        height = window_config.get('height', 600)
+        # 不要设置固定大小，允许窗口最大化
+        # self.setFixedSize(width, height)
+        self.resize(width, height)
+
+        # 读取全屏启动配置并设置
+        start_fullscreen = window_config.get('start_fullscreen', False)
+        if start_fullscreen:
+            self.showMaximized()
+        else:
+            self.showNormal()
+
+        # 允许窗口最大化
+        self.setWindowFlags(self.windowFlags() | Qt.WindowMaximizeButtonHint)
 
     def init_ui(self):
-        # 直接使用容器布局
-        container = QWidget()
-        self.main_layout = QVBoxLayout(container)
-        self.draw_panel = DrawPanel(parent=self, config=self.config)
-        # 替换为直接操作splitter设置比例（假设DrawPanel包含splitter属性）
-        if hasattr(self.draw_panel, 'splitter'):
-            total_width = self.width()  # 获取当前窗口宽度
-            left_width = int(total_width * 0.3)  # 默认左侧占30%
-            right_width = total_width - left_width
-            self.draw_panel.splitter.setSizes([left_width, right_width])
-        self.main_layout.addWidget(self.draw_panel)
-        self.setCentralWidget(container)
-        self.resize(800, 600)
-        self.setWindowTitle("学生抽签系统")
-        self.init_menu()  # 确保菜单初始化
+        # 创建主分割器
+        splitter = QSplitter(Qt.Horizontal)
 
-        # 应用全局样式（改为绝对导入）
-        # 应用全局样式（增加异常处理）
+        # 左边布局
+        left_widget = QWidget()
+        left_layout = QVBoxLayout()
+
+        # 在抽签中的姓名显示区域上方添加伸缩空间，将其往下移动
+        left_layout.addStretch()
+
+        # 添加抽签中的姓名显示区域
+        self.drawing_label = QLabel("准备抽签", left_widget)
+        # 设置抽签界面的字体大小
+        drawing_font_size = self.config.get('font', {}).get('drawing_label_size', 12)
+        drawing_font = self.drawing_label.font()
+        drawing_font.setPointSize(drawing_font_size)
+        self.drawing_label.setFont(drawing_font)
+        left_layout.addWidget(self.drawing_label, alignment=Qt.AlignHCenter)
+
+        # 在标签和按钮之间添加伸缩空间
+        left_layout.addStretch()
+
+        # 从配置文件中获取填充参数
+        padding = self.config.get('padding', "10px")  # 可以根据需要调整默认值
+
+        # 获取按钮间距配置
+        button_spacing = self.config.get('button', {}).get('spacing', 20)
+
+        # 提取设置按钮样式的函数
+        def set_button_style(button, config):
+            btn_font_size = self.config.get('font', {}).get('button_size', 12)
+            btn_font = button.font()
+            btn_font.setPointSize(btn_font_size)
+            button.setFont(btn_font)
+
+            padding = f"padding-top: {config.get('padding_top', '5px')}; " \
+                      f"padding-bottom: {config.get('padding_bottom', '5px')}; " \
+                      f"padding-left: {config.get('padding_left', '10px')}; " \
+                      f"padding-right: {config.get('padding_right', '10px')};"
+            button.setStyleSheet(f"background-color: {config.get('color', '#FFFFFF')}; {padding}")
+
+            if 'height' in config:
+                button.setFixedHeight(config['height'])
+
+        # 设置按钮字体大小，确保 btn_font 被正确定义
+        btn_font_size = self.config.get('font', {}).get('button_size', 12)
+        btn_font = QFont()
+        btn_font.setPointSize(btn_font_size)
+
+        # 添加抽签按钮
+        self.draw_btn = QPushButton("开始抽签", left_widget)
+        self.draw_btn.clicked.connect(self.start_draw)
+        self.draw_btn.setFont(btn_font)  # 这里使用已定义的 btn_font
+        draw_btn_config = self.config.get('button', {}).get('draw', {})
+        set_button_style(self.draw_btn, draw_btn_config)
+
+        # 提取创建中止和重置按钮的方法
+        stop_reset_layout = self.create_stop_reset_buttons()
+        # 使用 spacing 参数设置开始抽签按钮和中止、重置按钮布局之间的间距
+        left_layout.addWidget(self.draw_btn, alignment=Qt.AlignHCenter)
+        left_layout.addSpacing(self.spacing)
+        left_layout.addLayout(stop_reset_layout)
+
+        draw_width = draw_btn_config.get('width', 100)
+        draw_height = draw_btn_config.get('height', 30)
+        self.draw_btn.setFixedSize(draw_width, draw_height)
+
+        # 删除重复创建中止和重置按钮的代码
+
+        left_widget.setLayout(left_layout)
+
+        # 右边布局
+        right_widget = QWidget()
+        right_layout = QVBoxLayout()
+
+        # 添加结果显示区域
+        self.result_text = QTextEdit(right_widget)
+        self.result_text.setReadOnly(True)
+        # 设置结果显示区域字体大小
+        result_font_size = self.config.get('font', {}).get('result_text_size', 12)
+        result_font = self.result_text.font()
+        result_font.setPointSize(result_font_size)
+        self.result_text.setFont(result_font)
+        right_layout.addWidget(self.result_text)
+
+        right_widget.setLayout(right_layout)
+
+        # 将左右部件添加到分割器
+        splitter.addWidget(left_widget)
+        splitter.addWidget(right_widget)
+
+        # 设置主窗口的中央部件为分割器
+        self.setCentralWidget(splitter)
+
+    def handle_error(self, error_message, log_message=None):
+        if log_message:
+            print(log_message)
+        QMessageBox.warning(self, "错误", error_message)
+
+    def auto_load_student_list(self):
+        excel_file_path = self._get_excel_file_path()
+        if not excel_file_path:
+            return
+
         try:
-            from src.utils.style_manager import apply_global_style
-            apply_global_style(self)
-        except ImportError as e:
-            logging.error("样式加载失败: %s", str(e))
-        
-        self.show()
-        QApplication.processEvents()
-
-    # 删除重复的垂直布局init_ui方法（保留水平布局版本）
-    # 合并重复导入（保留最终版）
-    from PyQt5.QtWidgets import (QMainWindow, QMenuBar, QAction, QDialog, 
-                                QVBoxLayout, QLabel, QTimeEdit, QPushButton, 
-                                QHBoxLayout, QMessageBox, QWidget, QApplication, 
-                                QFontDialog, QTextEdit)  # 包含QTextEdit的完整导入
-    # 修改前的错误导入
-    # from ui.draw_panel import DrawPanel
-    
-    # 修改后的正确导入（使用绝对路径）
-    from src.ui.draw_panel import DrawPanel
-    from ui.setting_panel import SettingPanel
-    from ui.history_dialog import HistoryDialog
-    import logging
-    from config.config_manager import ConfigManager
-    from PyQt5.QtGui import QFont
-    from .draw_panel import DrawPanel  # 清理重复的DrawPanel导入
-    
-    # 删除重复的MainWindow类定义（保留唯一实例）
-    # class MainWindow(QMainWindow):  # 注释掉重复定义
-    #     def __init__(self, config):
-    #         super().__init__()
-    #         self.config = config
-    #         self.init_ui()
-    # 删除重复的init_ui方法，保留以下有效实现
-    def init_ui(self):
-        container = QWidget()
-        self.main_layout = QHBoxLayout(container)
-        self.main_layout.setContentsMargins(0,0,0,0)
-        
-        # 确保DrawPanel正确初始化
-        self.draw_panel = DrawPanel(parent=self, config=self.config)
-        self.main_layout.addWidget(self.draw_panel)
-        
-        self.setCentralWidget(container)
-        self.setWindowTitle("学生抽签系统 V2.0")
-        self.init_menu()
-        self.show()  # 新增显示主窗口
-
-    def init_menu(self):
-        """初始化完整菜单结构"""
-        menu_bar = QMenuBar(self)
-        
-        # 系统设置菜单
-        system_menu = menu_bar.addMenu("系统设置")
-        param_action = QAction("参数设置", self)
-        font_action = QAction("字体设置", self)
-        # 新增"关于系统"菜单项
-        about_action = QAction("关于系统", self)
-        # 添加所有菜单项（包含新增的关于系统）
-        system_menu.addActions([param_action, font_action, about_action])
-        param_action.triggered.connect(self.show_settings)
-        font_action.triggered.connect(self.set_global_font)
-        # 连接关于系统的点击事件
-        about_action.triggered.connect(self.show_about_dialog)
-
-        # 抽签管理菜单
-        draw_menu = menu_bar.addMenu("抽签管理")
-        mode_action = QAction("抽签模式设置", self)
-        display_action = QAction("抽签显示设置", self)
-        weight_action = QAction("抽签权重设置", self)
-        history_action = QAction("抽签历史查看", self)
-        draw_menu.addActions([mode_action, display_action, weight_action, history_action])
-        weight_action.triggered.connect(self.draw_panel.show_weight_manager)
-        history_action.triggered.connect(self.show_history)
-
-        # 学生管理菜单
-        student_menu = menu_bar.addMenu("学生管理")
-        add_action = QAction("添加学生", self)
-        del_action = QAction("删除学生", self)
-        absence_action = QAction("缺席设置", self)
-        student_menu.addActions([add_action, del_action, absence_action])
-        add_action.triggered.connect(self.show_add_student_dialog)
-        absence_action.triggered.connect(self.show_absence_dialog)
-
-        # 课程作息菜单
-        schedule_menu = menu_bar.addMenu("课程作息管理")
-        time_action = QAction("课程时间设置", self)
-        schedule_menu.addAction(time_action)
-        time_action.triggered.connect(self.show_schedule_settings)
-
-        self.setMenuBar(menu_bar)
-
-    def show_error_dialog(self, message):
-        """新增缺失的错误提示方法"""
-        QMessageBox.critical(self, "错误", message)
-
-    def show_settings(self):
-        """显示系统设置面板"""
-        from .setting_panel import SettingPanel
-        self.setting_panel = SettingPanel(self.config)
-        self.setting_panel.show()
-
-    def show_add_student_dialog(self):
-        """显示添加学生对话框"""
-        from .student_dialog import StudentDialog
-        dialog = StudentDialog(self)
-        if dialog.exec_():
-            student_id, name = dialog.get_student_info()
-            if student_id and name:
-                StudentManager.add_student(student_id, name)
-
-    def show_history(self):
-        """显示历史记录对话框"""
-        from .history_dialog import HistoryDialog
-        dialog = HistoryDialog(self)
-        dialog.exec_()
-
-
-    def reset_layout(self):
-        """重置窗口布局"""
-        self.draw_panel.set_splitter_ratio(30)
-        QMessageBox.information(self, "提示", "布局已重置为默认")
-
-    def set_global_font(self):
-        """改进后的字体设置方法"""
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QDialogButtonBox
-        from utils.constants import FontApplyArea  # 确保在此处导入枚举
-        
-        dialog = QDialog(self)
-        layout = QVBoxLayout()
-        
-        # 字体选择控件
-        font_dialog = QFontDialog(self)
-        
-        # 区域选择控件
-        area_buttons = QDialogButtonBox()
-        for area in FontApplyArea:  # 现在FontApplyArea已正确引用
-            btn = area_buttons.addButton(area.value, QDialogButtonBox.ActionRole)
-            btn.setObjectName(area.name)
-        
-        layout.addWidget(font_dialog)
-        layout.addWidget(area_buttons)
-        dialog.setLayout(layout)
-        
-        def apply_font():
-            font = font_dialog.currentFont()
-            area = FontApplyArea[area_buttons.checkedButton().objectName()]
-            self.draw_panel.apply_global_font(font, area)
-            dialog.accept()
-        
-        area_buttons.accepted.connect(apply_font)
-        area_buttons.rejected.connect(dialog.reject)
-        dialog.exec_()
-
-    def show_absence_dialog(self):
-        """显示缺席设置对话框"""
-        from .absence_dialog import AbsenceDialog
-        dialog = AbsenceDialog(self)
-        dialog.exec_()
-
-    def show_schedule_settings(self):
-        """课程时间设置"""
-        from .schedule_dialog import ScheduleDialog
-        dialog = ScheduleDialog(self)
-        if dialog.exec_():
-            QMessageBox.information(self, "成功", "课程时间设置已更新")
-
-    # 在closeEvent方法中移除配置保存逻辑
-    def closeEvent(self, event):
-        try:
-            # 移除保存布局的代码
-            pass
+            if excel_file_path.exists():
+                self._load_or_create_students(excel_file_path)
+            else:
+                self._create_and_load_sample_file(excel_file_path)
         except Exception as e:
-            # 移除错误处理代码
-            pass
-        finally:
-            event.accept()
+            self.handle_error(f"处理学生名单文件时出错: {e}", f"处理学生名单文件时出错: {e}")
 
-    def show_about_dialog(self):
-        """显示关于系统对话框（支持文本复制）"""
-        dialog = QDialog(self)
-        dialog.setWindowTitle("关于系统")
-        dialog.setMinimumSize(600, 300)  # 增大最小尺寸
-        dialog.resize(800, 400)  # 设置默认尺寸
-        
-        layout = QVBoxLayout()
-        
-        # 使用QTextEdit支持文本选择复制
-        about_text = QTextEdit()
-        about_text.setReadOnly(True)
-        about_text.setText("""
-            学生抽签系统 V2.0\n
-            开发者：Liuzhiwen\n
-            版本日期：2025-06\n
-            功能说明：支持班级学生随机抽签、权重设置、历史记录查询等功能\n
-            技术支持：liuzhiwenmr@gmail.com
-            https://github.com/LiuHanKing/SLES
-        """)
-        about_text.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # 添加自适应策略
-        
-        layout.addWidget(about_text)
-        dialog.setLayout(layout)
-        dialog.exec_()
+    def _get_excel_file_path(self):
+        excel_file_path_str = self.config.get("excel_file_path")
+        if not excel_file_path_str:
+            print("配置文件中未找到 'excel_file_path' 配置项，请检查配置文件。")
+            QMessageBox.warning(self, "错误", "配置文件中未找到 'excel_file_path' 配置项，请检查配置文件。")
+            return None
+        return Path(__file__).parents[2] / excel_file_path_str
+
+    def _load_or_create_students(self, excel_file_path):
+        try:
+            df = pd.read_excel(excel_file_path)
+            expected_columns = ["学号", "姓名"]
+            if all(col in df.columns for col in expected_columns):
+                # 去重处理
+                df = df.drop_duplicates(subset=["学号"])
+                students = ExcelService.load_students(str(excel_file_path))
+                self.draw_service.load_students(students)
+                print("学生名单自动加载成功")
+            else:
+                print("Excel 文件列名不匹配，将创建示例文件。")
+                self._create_and_load_sample_file(excel_file_path)
+        except Exception as e:
+            raise
+
+    def _create_and_load_sample_file(self, excel_file_path):
+        try:
+            excel_file_path.parent.mkdir(parents=True, exist_ok=True)
+            sample_data = {
+                "学号": [f"00{i}" for i in range(1, 11)],
+                "姓名": [f"学生{i}" for i in range(1, 11)]
+            }
+            df = pd.DataFrame(sample_data)
+            df.to_excel(excel_file_path, index=False)
+            students = ExcelService.load_students(str(excel_file_path))
+            self.draw_service.load_students(students)
+            print(f"学生名单文件 {excel_file_path.name} 创建成功并加载")
+        except Exception as e:
+            self.handle_error(f"创建学生名单文件 {excel_file_path.name} 时出错: {e}", f"创建学生名单文件 {excel_file_path.name} 时出错: {e}")
+
+    def start_draw(self):
+        try:
+            self.is_drawing = True
+            self.draw_btn.setEnabled(False)
+            self.stop_btn.setEnabled(True)
+            self.drawing_label.setText("抽签中: ")
+            count = 1  # 单次抽签人数
+            mode = "single"  # 抽签模式
+            config = ConfigService.load_config()
+            duration = config.get("animation", {}).get("duration", 5)
+            scroll_speed = config.get("animation", {}).get("scroll_speed", 50)
+
+            # 获取学生列表
+            students = self.draw_service.students
+
+            def callback():
+                results = self.draw_service.start_draw(count, mode)
+                result_str_list = []
+                for s in results:
+                    student_id = s.student_id if hasattr(s, 'student_id') else ""
+                    if student_id:
+                        result_str_list.append(f"{student_id}-{s.name}")
+                    else:
+                        result_str_list.append(s.name)
+                result_str = "\n".join(result_str_list)
+                # 追加结果到结果显示区域
+                current_text = self.result_text.toPlainText()
+                if current_text:
+                    self.result_text.append(result_str)
+                else:
+                    self.result_text.setText(result_str)
+                self.save_draw_record()  # 保存抽签记录
+                self.is_drawing = False
+                self.draw_btn.setEnabled(True)
+                self.stop_btn.setEnabled(False)
+                self.drawing_label.setText("准备抽签")
+
+            # 检查 DrawService.start_animation 方法的参数需求，这里假设需要调整参数
+            # 若 start_animation 方法需要 students 参数，可能需要调整方法定义
+            self.draw_service.start_animation(duration, callback, scroll_speed, self.drawing_label)
+
+        except ValueError as e:
+            print(f"抽签出错: {e}")
+            QMessageBox.warning(self, "错误", f"抽签出错: {e}")
+            self.is_drawing = False
+            self.draw_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+            self.drawing_label.setText("准备抽签")
+
+    def reset_draw(self):
+        # 停止正在进行的动画
+        self.draw_service.stop_animation()
+        # 清空结果显示区域
+        self.result_text.clear()
+        self.drawing_label.setText("准备抽签")
+        # 重置抽签服务状态
+        self.draw_service.reset()  # 假设 DrawService 有 reset 方法
+        self.is_drawing = False
+        self.draw_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+
+    def save_draw_record(self):
+        record = self.draw_service.history[-1]
+        RecordService.save_draw_record(record)
+
+    def set_button_style(self, button, config):
+        btn_font_size = self.config.get('font', {}).get('button_size', 12)
+        btn_font = button.font()
+        btn_font.setPointSize(btn_font_size)
+        button.setFont(btn_font)
+
+        padding = f"padding-top: {config.get('padding_top', '5px')}; " \
+                  f"padding-bottom: {config.get('padding_bottom', '5px')}; " \
+                  f"padding-left: {config.get('padding_left', '10px')}; " \
+                  f"padding-right: {config.get('padding_right', '10px')};"
+        button.setStyleSheet(f"background-color: {config.get('color', '#FFFFFF')}; {padding}")
+
+        if 'height' in config:
+            button.setFixedHeight(config['height'])
+
+    def create_stop_reset_buttons(self):
+        btn_font_size = self.config.get('font', {}).get('button_size', 12)
+        btn_font = QFont()
+        btn_font.setPointSize(btn_font_size)
+
+        stop_reset_layout = QHBoxLayout()
+        self.stop_btn = QPushButton("中止抽签", self)
+        self.stop_btn.clicked.connect(self.stop_draw)
+        self.stop_btn.setFont(btn_font)
+        self.stop_btn.setEnabled(False)
+        stop_btn_config = self.config.get('button', {}).get('stop', {})
+        self.set_button_style(self.stop_btn, stop_btn_config)
+
+        self.reset_btn = QPushButton("重置抽签", self)
+        self.reset_btn.clicked.connect(self.reset_draw)
+        self.reset_btn.setFont(btn_font)
+        reset_btn_config = self.config.get('button', {}).get('reset', {})
+        self.set_button_style(self.reset_btn, reset_btn_config)
+
+        # 使用 spacing 参数设置中止按钮和重置按钮之间的间距
+        stop_reset_layout.addWidget(self.stop_btn)
+        stop_reset_layout.addSpacing(self.spacing)
+        stop_reset_layout.addWidget(self.reset_btn)
+        return stop_reset_layout
+
+    def stop_draw(self):
+        try:
+            # 停止动画
+            self.draw_service.stop_animation()
+            self.is_drawing = False
+            self.draw_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+            self.drawing_label.setText("准备抽签")
+            print("抽签已中止")
+        except Exception as e:
+            print(f"中止抽签时出错: {e}")
+            QMessageBox.warning(self, "错误", f"中止抽签时出错: {e}")
