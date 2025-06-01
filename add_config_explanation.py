@@ -40,10 +40,13 @@ config_explanation = '''### window 窗口配置
 
 ### padding 内边距配置
 - padding: 元素的内边距，当前值为 "5px"。
+
+### draw 抽签配置
+- allow_repeat: 是否允许本轮抽签重复，true 表示允许，false 表示不允许，当前值为 false。
 '''
 
 # 写入文件
-file_path = r'd:\Software\Workspaces\Trae\SLES\conf\conf参数说明.txt'
+file_path = r'conf\conf参数说明.txt'
 with open(file_path, 'w', encoding='utf-8') as f:
     f.write(config_explanation)
 

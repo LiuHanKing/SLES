@@ -4,7 +4,7 @@
         "top_ratio": 60,
         "width": 800,
         "height": 600,
-        "start_fullscreen": true  
+        "start_fullscreen": true
     },
     "animation": {
         "duration": 3,
@@ -22,7 +22,7 @@
     "excel_file_path": "conf/students.xlsx",
     "button": {
         "draw": {
-            "color": "#4CAF50", 
+            "color": "#4CAF50",
             "width": 200,
             "height": 80,
             "padding_top": "5px",
@@ -51,5 +51,8 @@
     },
     "spacing": 50,
     "padding": "50px",
-    "conf_explanation_file": "conf/conf参数说明.txt"
+    "conf_explanation_file": "conf/conf参数说明.txt",
+    "draw": {
+        "allow_repeat": false
+    }
 }

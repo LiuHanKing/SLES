@@ -58,11 +58,18 @@ class MainWindow(QMainWindow):
         left_widget = QWidget()
         left_layout = QVBoxLayout()
 
-        # 在抽签中的姓名显示区域上方添加伸缩空间，将其往下移动
-        left_layout.addStretch()
+        # 增加伸缩空间，将 “抽签中” 区域往下移动
+        # 修改前：left_layout.addStretch()
+        left_layout.addStretch(1)  # 可根据实际情况调整数值，数值越大，标签越往下
 
         # 添加抽签中的姓名显示区域
         self.drawing_label = QLabel("准备抽签", left_widget)
+        # 设置标签的对齐方式为水平居中
+        self.drawing_label.setAlignment(Qt.AlignHCenter)
+        # 允许标签在水平方向上扩展
+        self.drawing_label.setWordWrap(False)
+        self.drawing_label.setMinimumWidth(100)  # 可以根据实际情况调整最小宽度
+
         # 设置抽签界面的字体大小
         drawing_font_size = self.config.get('font', {}).get('drawing_label_size', 12)
         drawing_font = self.drawing_label.font()
@@ -70,8 +77,9 @@ class MainWindow(QMainWindow):
         self.drawing_label.setFont(drawing_font)
         left_layout.addWidget(self.drawing_label, alignment=Qt.AlignHCenter)
 
-        # 在标签和按钮之间添加伸缩空间
-        left_layout.addStretch()
+        # 减少标签和按钮之间的伸缩空间，让按钮往上移动
+        # 修改前：left_layout.addStretch()
+        left_layout.addStretch(1)  # 可根据实际情况调整数值，数值越小，按钮越往上
 
         # 从配置文件中获取填充参数
         padding = self.config.get('padding', "10px")  # 可以根据需要调整默认值
@@ -141,6 +149,18 @@ class MainWindow(QMainWindow):
         # 将左右部件添加到分割器
         splitter.addWidget(left_widget)
         splitter.addWidget(right_widget)
+
+        # 获取配置文件中的左框比例
+        left_ratio = self.config.get('window', {}).get('left_ratio', 40)
+        right_ratio = 100 - left_ratio
+
+        # 获取分割器的总宽度
+        total_width = splitter.width()
+        left_width = int(total_width * left_ratio / 100)
+        right_width = total_width - left_width
+
+        # 设置分割器的比例
+        splitter.setSizes([left_width, right_width])
 
         # 设置主窗口的中央部件为分割器
         self.setCentralWidget(splitter)

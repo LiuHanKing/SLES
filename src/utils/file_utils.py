@@ -33,7 +33,17 @@ def create_default_config(config_file: Path):
 
 def create_student_template(student_template: Path):
     try:
-        ExcelService.create_template_with_samples(str(student_template))
+        student_names = [
+            "其家豪", "屠梓睿", "刁梓睿", "胡红", "万敬阳",
+            "泰梓睿", "纵国平", "詹丽", "张三", "李四"
+        ]
+        data = {
+            "学号": [f"{i:03d}" for i in range(1, len(student_names) + 1)],
+            "姓名": student_names
+        }
+        import pandas as pd
+        df = pd.DataFrame(data)
+        df.to_excel(str(student_template), index=False)
         logger.info(f"创建学生模板文件: {student_template}")
     except Exception as e:
         logger.error(f"创建学生模板文件时出错: {e}")
