@@ -3,10 +3,9 @@ from PyQt5.QtCore import Qt
 
 class AboutDialog(QDialog):
     def __init__(self, parent=None):
-        print("AboutDialog 初始化开始")  # 添加调试信息
+        # 删除调试信息
         super().__init__(parent)
         self.init_ui()
-        print("AboutDialog 初始化结束")  # 添加调试信息
 
     def init_ui(self):
         # 去掉窗口问号

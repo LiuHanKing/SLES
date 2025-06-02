@@ -42,6 +42,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# 删除第一个重复的 start_animation 函数
+
 def start_animation(result_label, scroll_speed, duration, callback, students=None, mode="rolling"):
     try:
         logger.info(f"开始 {mode} 动画")

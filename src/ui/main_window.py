@@ -347,14 +347,10 @@ class MainWindow(QMainWindow):
 
     def init_menu(self):
         menu_bar = self.menuBar()
-        about_menu = QMenu("关于", self)
-        about_action = QAction("关于系统", self)
-        about_action.triggered.connect(self.show_about_info)
-        about_menu.addAction(about_action)
-        menu_bar.addMenu(about_menu)
-        help_menu = menu_bar.addMenu("帮助")
-        about_action = help_menu.addAction("关于系统")
+        # 创建关于菜单并直接连接点击事件
+        about_action = QAction("关于", self)
         about_action.triggered.connect(self.show_about_dialog)
+        menu_bar.addAction(about_action)
 
     def show_about_dialog(self):
         dialog = AboutDialog(self)
@@ -649,17 +645,3 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"中止抽签时出错: {e}")
             QMessageBox.warning(self, "错误", f"中止抽签时出错: {e}")
-
-    def init_menu(self):
-        menu_bar = self.menuBar()
-        about_menu = QMenu("关于", self)
-        about_action = QAction("关于系统", self)
-        about_action.triggered.connect(self.show_about_dialog)
-        about_menu.addAction(about_action)
-        menu_bar.addMenu(about_menu)
-
-
-    def show_about_info(self):
-        from src.ui.about_dialog import AboutDialog
-        about_dialog = AboutDialog(self)
-        about_dialog.exec_()
