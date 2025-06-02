@@ -3,6 +3,7 @@ from pathlib import Path
 from services.excel_service import ExcelService
 import logging
 import subprocess  # 新增导入
+import pandas as pd  # 统一在开头导入
 
 logger = logging.getLogger(__name__)
 
@@ -63,15 +64,7 @@ def init_app_files():
     else:
         logger.info(f"配置文件已存在: {config_file}")
     
-    # 检查 conf参数说明.txt 是否存在
-    explanation_file = config_dir / "conf参数说明.txt"
-    if not explanation_file.exists():
-        try:
-            # 执行 add_config_explanation.py 脚本
-            subprocess.run(["python", "../add_config_explanation.py"], check=True)
-            logger.info("成功执行 add_config_explanation.py 脚本")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"执行 add_config_explanation.py 脚本时出错: {e}")
+    # 移除检查 conf参数说明.txt 和执行 add_config_explanation.py 的代码
 
     logger.info("应用文件初始化完成")
 
@@ -83,6 +76,7 @@ def init_app_files():
         if not excel_file_path.exists():
             create_student_template(excel_file_path)
 
+# 删除重复的 pandas 导入和 create_student_template_file 函数
 import os
 from pathlib import Path
 from services.config_service import ConfigService

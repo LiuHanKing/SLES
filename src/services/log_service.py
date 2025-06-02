@@ -4,11 +4,8 @@ from services.config_service import ConfigService
 
 def configure_logging():
     config = ConfigService.load_config()
-    log_level = "DEBUG"  # 强制设置为 DEBUG 级别
-    if "log" in config and "level" in config["log"]:
-        log_level = config["log"]["level"].upper()
-    else:
-        print("配置文件中未找到 'log' 或 'level' 配置项，使用默认日志级别 DEBUG")
+    # 删除强制设置为 DEBUG 级别的代码
+    log_level = config.get("log", {}).get("level", "DEBUG").upper()
 
     log_dir = Path(__file__).parents[2] / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)

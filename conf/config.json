@@ -1,4 +1,7 @@
 {
+    "system": {
+        "name": "学生抽签系统"
+    },
     "window": {
         "left_ratio": 40,
         "top_ratio": 60,
