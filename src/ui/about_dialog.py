@@ -3,8 +3,10 @@ from PyQt5.QtCore import Qt
 
 class AboutDialog(QDialog):
     def __init__(self, parent=None):
+        print("AboutDialog 初始化开始")  # 添加调试信息
         super().__init__(parent)
         self.init_ui()
+        print("AboutDialog 初始化结束")  # 添加调试信息
 
     def init_ui(self):
         # 去掉窗口问号
@@ -13,7 +15,9 @@ class AboutDialog(QDialog):
         self.setWindowTitle("关于系统")
         layout = QVBoxLayout()
 
-        info_label = QLabel("系统名称: 抽签系统\n开发人员:liuzhiwen \n邮箱地址: liuzhiwenmr@gmail.com\n程序下载地址: https://github.com/LiuHanKing/SLES")
+        # 合并原有信息和开发信息
+        about_text = "系统名称: 抽签系统\n开发人员:liuzhiwen \n邮箱地址: liuzhiwenmr@gmail.com\n程序下载地址: https://github.com/LiuHanKing/SLES\n"
+        info_label = QLabel(about_text)
         # 设置文本可选择复制
         info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         info_label.setWordWrap(True)
