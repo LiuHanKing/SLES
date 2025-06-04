@@ -7,43 +7,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def start_animation(result_label, scroll_speed, duration, callback, student_ids, student_names):
-    # 这里可以添加对动画模式的处理，当前假设没有模式要求
-    timer = QTimer()
-    elapsed_time = 0
-    total_time = duration * 1000  # 转换为毫秒
-
-    def update_label():
-        nonlocal elapsed_time
-        if elapsed_time * scroll_speed >= total_time:
-            timer.stop()
-            callback()
-            return
-
-        # 随机选择一个学生显示
-        index = elapsed_time % len(student_ids)
-        student_id = student_ids[index]
-        student_name = student_names[index]
-        if student_id:
-            display_text = f"抽签中: {student_id}-{student_name}"
-        else:
-            display_text = f"抽签中: {student_name}"
-        result_label.setText(display_text)
-
-        elapsed_time += 1
-
-    timer.timeout.connect(update_label)
-    timer.start(scroll_speed)
-    return timer
-from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QLabel
-import random
-import logging
-
-logger = logging.getLogger(__name__)
-
-# 删除第一个重复的 start_animation 函数
-
 def start_animation(result_label, scroll_speed, duration, callback, students=None, mode="rolling"):
     try:
         logger.info(f"开始 {mode} 动画")

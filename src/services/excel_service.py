@@ -1,6 +1,7 @@
 import pandas as pd
 from pathlib import Path
 from models.student import Student
+import os
 
 class ExcelService:
     """Excel文件读写服务（仅支持xlsx）"""
@@ -12,8 +13,11 @@ class ExcelService:
                 for _, row in df.iterrows()]
     
     @staticmethod
-    def create_template(file_path: str):
-        df = pd.DataFrame(columns=["student_id", "name"])
+    def create_template(file_path):
+        # 确保目录存在
+        dir_path = os.path.dirname(file_path)
+        os.makedirs(dir_path, exist_ok=True)
+        df = pd.DataFrame(columns=["学号", "姓名"])
         df.to_excel(file_path, index=False)
 
     @staticmethod

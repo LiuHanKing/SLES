@@ -1,4 +1,5 @@
-import os  # 新增 os 模块导入
+import sys
+import os
 from pathlib import Path
 from PyQt5.QtWidgets import QMainWindow, QLabel, QMessageBox, QVBoxLayout, QWidget, QPushButton, QTextEdit, QSplitter, QHBoxLayout, QSpinBox, QComboBox, QFontComboBox
 from PyQt5.QtCore import Qt
@@ -11,28 +12,27 @@ import pandas as pd
 import json
 from PyQt5.QtWidgets import QMainWindow, QMenuBar, QMenu, QAction
 from src.ui.about_dialog import AboutDialog  # 导入 AboutDialog
+import random
+from datetime import datetime
+from src.models.draw_record import DrawRecord  # 确保导入 DrawRecord
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, base_dir):
         super().__init__()
-        self.draw_service = DrawService()  # 初始化抽签服务
-        self.config = ConfigService.load_config()  # 初始化配置
-        
-        # 获取系统名字
-        system_name = self.config.get('system', {}).get('name', '默认系统名称')
-        
-        # 设置窗口标题
-        self.setWindowTitle(system_name)
-        
-        # 修正配置文件路径
-        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'conf', 'config.json')
+        self.base_dir = base_dir
+        from services.draw_service import DrawService
+        self.draw_service = DrawService()  # 必须先初始化
+
+        conf_dir = os.path.join(self.base_dir, 'conf')
+        config_path = os.path.join(conf_dir, 'config.json')
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 self.config = json.load(f)
         except FileNotFoundError:
             print(f"未找到配置文件: {config_path}")
             QMessageBox.warning(self, "错误", f"未找到配置文件: {config_path}")
-        
+            self.config = {}  # 或者加载默认配置
+
         # 获取 spacing 参数
         self.spacing = self.config.get('spacing', 50)
         
@@ -201,7 +201,8 @@ class MainWindow(QMainWindow):
             print("配置文件中未找到 'excel_file_path' 配置项，请检查配置文件。")
             QMessageBox.warning(self, "错误", "配置文件中未找到 'excel_file_path' 配置项，请检查配置文件。")
             return None
-        return Path(__file__).parents[2] / excel_file_path_str
+        # 用 self.base_dir 拼接
+        return Path(self.base_dir) / excel_file_path_str
 
     def _load_or_create_students(self, excel_file_path):
         try:
@@ -250,7 +251,7 @@ class MainWindow(QMainWindow):
             students = self.draw_service.students
 
             def callback():
-                results = self.draw_service.start_draw(count, mode)
+                results = self.draw_students(count, mode)  # 调用重命名后的方法
                 result_str_list = []
                 for s in results:
                     student_id = s.student_id if hasattr(s, 'student_id') else ""
@@ -271,8 +272,6 @@ class MainWindow(QMainWindow):
                 self.stop_btn.setEnabled(False)
                 self.drawing_label.setText("准备抽签")
 
-            # 检查 DrawService.start_animation 方法的参数需求，这里假设需要调整参数
-            # 若 start_animation 方法需要 students 参数，可能需要调整方法定义
             self.draw_service.start_animation(duration, callback, scroll_speed, self.drawing_label)
 
         except ValueError as e:
@@ -282,6 +281,25 @@ class MainWindow(QMainWindow):
             self.draw_btn.setEnabled(True)
             self.stop_btn.setEnabled(False)
             self.drawing_label.setText("准备抽签")
+
+    # 重命名原有的业务逻辑方法
+    def draw_students(self, count: int, mode: str, draw_times: int = 1) -> list:
+        if mode == "single":
+            results = random.sample(self.draw_service.students, min(count, len(self.draw_service.students)))
+        elif mode == "all":
+            results = self.draw_service.students.copy()
+        else:
+            raise ValueError("无效抽签模式")
+        record = DrawRecord(
+            date=datetime.now().date(),
+            time=datetime.now().time(),
+            results=[str(s.student_id) for s in results],
+            count=count,
+            mode=mode,
+            draw_times=draw_times
+        )
+        self.draw_service.history.append(record)
+        return results
 
     def reset_draw(self):
         # 停止正在进行的动画
